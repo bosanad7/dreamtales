@@ -18,7 +18,7 @@ interface OpenRouterResponse {
   choices: { message: { content: string } }[];
 }
 
-async function chatCompletion(messages: OpenRouterMessage[], maxTokens = 2200): Promise<string> {
+async function chatCompletion(messages: OpenRouterMessage[], maxTokens = 1500): Promise<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is not set");
 
@@ -189,7 +189,7 @@ Return ONLY valid JSON, no markdown fences, no explanation:
   ]
 }`;
 
-  const rawText = await chatCompletion([{ role: "user", content: userPrompt }], 2200);
+  const rawText = await chatCompletion([{ role: "user", content: userPrompt }], 1500);
   const jsonStart = rawText.indexOf("{");
   const jsonEnd = rawText.lastIndexOf("}") + 1;
   if (jsonStart === -1 || jsonEnd === 0) throw new Error("No JSON found in model response");
