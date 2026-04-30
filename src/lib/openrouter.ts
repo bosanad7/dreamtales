@@ -8,7 +8,7 @@ import { StoryInput, StoryScene } from "./types";
 import { v4 as uuidv4 } from "uuid";
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const LLM_MODEL = process.env.OPENROUTER_MODEL ?? "anthropic/claude-3.5-sonnet";
+const LLM_MODEL = process.env.OPENROUTER_MODEL ?? "anthropic/claude-sonnet-4.5";
 
 interface OpenRouterMessage {
   role: "system" | "user" | "assistant";
