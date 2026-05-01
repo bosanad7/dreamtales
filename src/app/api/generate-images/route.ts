@@ -42,8 +42,7 @@ export async function POST(req: NextRequest) {
           }));
           const coverImageUrl = generatePlaceholderSvg(theme, title, 0);
           controller.enqueue(sseEvent({ type: "done", scenes: scenesOut, coverImageUrl, isPlaceholder: true }));
-          controller.close();
-          return;
+          return; // `finally` will close the controller
         }
 
         // ── DALL-E 3 — one image at a time with progress events ───────────
