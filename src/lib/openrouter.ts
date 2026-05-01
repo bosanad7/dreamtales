@@ -30,7 +30,14 @@ async function chatCompletion(messages: OpenRouterMessage[], maxTokens = 1500): 
       "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
       "X-Title": "DreamTales Bedtime Stories",
     },
-    body: JSON.stringify({ model: LLM_MODEL, messages, max_tokens: maxTokens, temperature: 0.85 }),
+    body: JSON.stringify({
+      model: LLM_MODEL,
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.85,
+      // Force the model to return valid JSON; prevents truncation-mid-string artifacts
+      response_format: { type: "json_object" },
+    }),
   });
 
   if (!res.ok) {
@@ -189,7 +196,9 @@ Return ONLY valid JSON, no markdown fences, no explanation:
   ]
 }`;
 
-  const rawText = await chatCompletion([{ role: "user", content: userPrompt }], 1500);
+  // Arabic uses ~3× more tokens per character than English, so give it a bigger budget
+  const tokenBudget = isArabic ? 3000 : 1500;
+  const rawText = await chatCompletion([{ role: "user", content: userPrompt }], tokenBudget);
   const jsonStart = rawText.indexOf("{");
   const jsonEnd = rawText.lastIndexOf("}") + 1;
   if (jsonStart === -1 || jsonEnd === 0) throw new Error("No JSON found in model response");
