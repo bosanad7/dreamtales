@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 interface AudioPlayerProps {
   audioUrl: string | undefined;
   fallbackText?: string; // used for browser TTS when no audioUrl
+  language?: string;     // ISO code: "en", "ar", etc.
   autoPlay?: boolean;
   onEnded?: () => void;
 }
@@ -56,7 +57,12 @@ export function useAudioPlayer(
 
 // ─── Browser TTS (Web Speech API fallback) ───────────────────────────────────
 
-export function useBrowserSpeech(text: string | undefined, autoPlay = false, onEnded?: () => void) {
+export function useBrowserSpeech(
+  text: string | undefined,
+  language: string = "en",
+  autoPlay = false,
+  onEnded?: () => void,
+) {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [supported] = useState(() => typeof window !== "undefined" && "speechSynthesis" in window);
@@ -68,12 +74,41 @@ export function useBrowserSpeech(text: string | undefined, autoPlay = false, onE
     utter.pitch = 1.05;
     utter.volume = 0.9;
 
-    // Prefer a calm English female voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(
-      (v) => v.lang.startsWith("en") && /female|samantha|karen|victoria|moira/i.test(v.name)
-    ) ?? voices.find((v) => v.lang.startsWith("en"));
-    if (preferred) utter.voice = preferred;
+    // Map our language code → BCP-47 tag the TTS engine expects
+    const langTag =
+      language === "ar" ? "ar-SA" :
+      language === "en" ? "en-US" :
+      language;
+    utter.lang = langTag;
+
+    // Pick the best voice for this language. Voices may not be loaded on the
+    // first render (Chrome quirk) — getVoices() can return [] until the
+    // `voiceschanged` event fires, but we still set utter.lang so the engine
+    // picks a reasonable default.
+    const pickVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) return;
+      const langPrefix = langTag.split("-")[0]; // "ar" / "en"
+
+      // Try exact-region match first, then any voice in that language
+      const exact = voices.find((v) => v.lang === langTag);
+      const sameLang = voices.find((v) => v.lang.startsWith(langPrefix));
+
+      // English-only: prefer a soft female voice when available
+      const preferredEn = langPrefix === "en"
+        ? voices.find(
+            (v) => v.lang.startsWith("en") &&
+              /female|samantha|karen|victoria|moira/i.test(v.name),
+          )
+        : undefined;
+
+      const chosen = preferredEn ?? exact ?? sameLang;
+      if (chosen) utter.voice = chosen;
+    };
+
+    pickVoice();
+    // Voices load asynchronously — re-pick once they're available
+    window.speechSynthesis.onvoiceschanged = pickVoice;
 
     utter.onend = () => { setIsPlaying(false); onEnded?.(); };
     utter.onerror = () => setIsPlaying(false);
@@ -86,9 +121,10 @@ export function useBrowserSpeech(text: string | undefined, autoPlay = false, onE
 
     return () => {
       window.speechSynthesis.cancel();
+      window.speechSynthesis.onvoiceschanged = null;
       setIsPlaying(false);
     };
-  }, [text, autoPlay, onEnded, supported]);
+  }, [text, language, autoPlay, onEnded, supported]);
 
   const play = useCallback(() => {
     if (!utteranceRef.current || !supported) return;
@@ -109,9 +145,14 @@ export function useBrowserSpeech(text: string | undefined, autoPlay = false, onE
 
 // ─── Unified AudioPlayer component ───────────────────────────────────────────
 
-export default function AudioPlayer({ audioUrl, fallbackText, autoPlay, onEnded }: AudioPlayerProps) {
+export default function AudioPlayer({ audioUrl, fallbackText, language = "en", autoPlay, onEnded }: AudioPlayerProps) {
   const elev = useAudioPlayer(audioUrl, autoPlay && !!audioUrl, audioUrl ? onEnded : undefined);
-  const tts  = useBrowserSpeech(!audioUrl ? fallbackText : undefined, autoPlay && !audioUrl, !audioUrl ? onEnded : undefined);
+  const tts  = useBrowserSpeech(
+    !audioUrl ? fallbackText : undefined,
+    language,
+    autoPlay && !audioUrl,
+    !audioUrl ? onEnded : undefined,
+  );
 
   const hasAudio = !!audioUrl;
   const isPlaying = hasAudio ? elev.isPlaying : tts.isPlaying;

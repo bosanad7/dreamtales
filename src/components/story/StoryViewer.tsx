@@ -189,6 +189,7 @@ export default function StoryViewer({ story }: StoryViewerProps) {
       <AudioPlayer
         audioUrl={scene.audioUrl}
         fallbackText={scene.text}
+        language={story.input.language}
         autoPlay={mode === "autoplay"}
         onEnded={mode === "autoplay" ? goNext : undefined}
       />
